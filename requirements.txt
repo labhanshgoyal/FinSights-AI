@@ -1,0 +1,14 @@
+streamlit
+pandas
+yfinance
+prophet
+plotly
+scikit-learn
+seaborn
+matplotlib
+numpy
+newsapi-python
+textblob
+ta
+flask
+pyngrok
