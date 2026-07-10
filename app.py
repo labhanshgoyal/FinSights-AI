@@ -121,15 +121,52 @@ with main_col:
 
     with tab1:
         st.header("📈 Price Forecast")
-        st.info("🚧 Prophet forecasting will be added next (Section 1)")
+        
+        if "Close" in df.columns:
+            df_prophet=df.rename(columns={"Date":"ds","Close":"y"})
+
+        elif "Adj Close" in df.columns:
+            df_prophet=df.rename(columns={"Date":"ds", "Adj Close":"y"})
+        else:
+            st.error("⚠️ No Price Column Found")
+            st.stop()
+
+    df_prophet = df_prophet[["ds", "y"]].copy()
+    df_prophet["ds"]= pd.to_datetime(df_prophet["ds"])
+    df_prophet["y"]= pd.to_numeric(df_prophet["y"], errors="coerce")
+    df_prophet=df_prophet.dropna()
+
+    #Train Prophet Model
+    model = Prophet(daily_seasonality=True) #create model (detects daily patterns)
+    model.fit(df_prophet) #train on historical data
+
+    #Make Future Predictions
+    future = model.makke_future_dataframe(periods=forecast_days)
+    forecast=model.predict(future)
+
+    #Chart-1: Interactive forecast with confidence bands
+    fig=px.line(forecast, x="ds", y="yhat", title=f"{ticker} - {forecast_days}-Day Forecast")
+    fig.add_scatter(x=forecast["ds"], y=forecast["yhat_upper"], mode="lines", name="Upper Bound", line=dict(dash="dot", color="gray")) #upper confidence bound
+    fig.add_scatter(x=forecast["ds"], y=forecast["yhat_lower"], mode="lines", name="Lower Bound",  line=dict(dash="dot", color="red")) #lower confidence bound
+    st.plotly_chart(fig, width=0) #render the chart
+
+    #Chart-2: Actual vs Forecasted Values
+    fig2, ax = plt.subplots(figsize=(10, 5)) #create matplotlib figure
+    ax.plot(df_prophet["ds"], df_prophet["y"], label="Actual", color="blue") #actual values
+    ax.plot(forecast["ds"], forecast["yhat"], label="Predicted", color="orange") #predicted values
+    ax.fill_between(forecast["ds"], forecast["yhat_lower"], forecast["yhat_upper"],  alpha=0.2, color="gray") #confidence intervals
+    ax.set_title(f"{ticker} — Actual vs Predicted")
+    ax.legend()
+    st.pyplot(fig2)
 
     with tab2:
-            st.header("🎯 Predict Direction")
-            st.info("🚧 Randomforest prediction will be added next (Section 2)")
+        st.header("🎯 Predict Direction")
 
+        #Ensure close column exists
+        
     with tab3:
-            st.header("📰 News & Sentiment")
-            st.info("🚧 Sentiment Analysis will be added in Phase 1")
+        st.header("📰 News & Sentiment")
+        st.info("🚧 Sentiment Analysis will be added in Phase 1")
 
 with chat_col:
     st.subheader("💬 Ask FinSights-AI")
