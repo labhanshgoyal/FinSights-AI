@@ -1,0 +1,12 @@
+streamlit
+pandas
+numpy
+yfinance
+prophet
+plotly
+scikit-learn
+seaborn
+matplotlib
+newsapi-python
+textblob
+google-generativeai
