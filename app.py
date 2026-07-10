@@ -141,7 +141,7 @@ with main_col:
     model.fit(df_prophet) #train on historical data
 
     #Make Future Predictions
-    future = model.makke_future_dataframe(periods=forecast_days)
+    future = model.make_future_dataframe(periods=forecast_days)
     forecast=model.predict(future)
 
     #Chart-1: Interactive forecast with confidence bands
@@ -163,7 +163,7 @@ with main_col:
         st.header("🎯 Predict Direction")
 
         #Ensure close column exists
-        
+
     with tab3:
         st.header("📰 News & Sentiment")
         st.info("🚧 Sentiment Analysis will be added in Phase 1")
