@@ -225,7 +225,7 @@ with main_col:
 
         #Get API Keys
         try:
-            news_api_key = st.secrets["NEWS_API_KEY"]
+            news_api_key = st.secrets["6c3873698b584ee89dab96e14bcfaf7a"]
         except Exception:
             st.warning("Add NEWS_API_KEY in .streamlit/secrets.toml to enable this feature.")
             st.stop()
