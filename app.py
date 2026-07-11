@@ -302,7 +302,7 @@ with main_col:
 
                 styled_df = sentiment_df[["Date", "Headline", "Source", "Sentiment"]]
                 st.dataframe(
-                    styled_df.style.applymap(color_sentiment, subset=["Sentiment"]),
+                    styled_df.style.map(color_sentiment, subset=["Sentiment"]),
                     use_container_width=True,
                     height=400
                 )
