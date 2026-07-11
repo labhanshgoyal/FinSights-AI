@@ -8,6 +8,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 import seaborn as sns
 import matplotlib.pyplot as plt
+from newsapi import NewsApiClient
+from textblob import TextBlob
+from datetime import datetime, timedelta
 
 # Streamlit App
 
@@ -219,7 +222,91 @@ with main_col:
 
     with tab3:
         st.header("📰 News & Sentiment")
-        st.info("🚧 Sentiment Analysis will be added in Phase 1")
+
+        #Get API Keys
+        try:
+            news_api_key = st.secrets["NEWS_API_KEY"]
+        except Exception:
+            st.warning("Add NEWS_API_KEY in .streamlit/secrets.toml to enable this feature.")
+            st.stop()
+
+        #Fetch News Article
+        @st.cache_data(ttl=3600)
+        def fetch_news(query):
+            newsapi=NewsApiClient(api_key=news_api_key)
+            today=datetime.now()
+            month_ago=today-timedelta(days=28)
+            articles=newsapi.get_everything(
+                q=query, #search term (company name)
+                from_param=month_ago.strftime("%Y-%m-%d"), #start date
+                to=today.strftime("%Y-%m-%d"), #end date
+                language="en", #English only
+                sort_by="publishedAt", #most recent first
+                page_size=30 #top 30 articles
+            )
+            return articles.get("articles",[])
+
+        #Score sentiment for each headline
+        def analyze_sentiment(articles):
+            results=[]
+            for article in articles:
+                title=article.get("title", "")
+                if not title or title == "[Removed]":
+                    continue
+                score=TextBlob(title).sentiment.polarity
+                results.append({
+                    "Date": article.get("publishedAt", "")[:10],
+                    "Headline": title,
+                    "Source": article.get("source", {}).get("name", "Unknown"),
+                    "Sentiment": round(score, 3)
+                })
+            return pd.DataFrame(results)
+
+        #Get company name from ticker for search
+        company_name=selected_stock.split("(")[0].strip()
+
+        with st.spinner("Fetching News..."):
+            articles=fetch_news(company_name)
+
+        if not articles:
+            st.warning(f"No news found for {company_name}.")
+        else:
+            sentiment_df=analyze_sentiment(articles)
+
+            if sentiment_df.empty:
+                st.warning("Could not analyze sentiment.")
+            else:
+                #Avg Sentiment metric
+                avg_sentiment=sentiment_df["Sentiment"].mean()
+                sentiment_label="Positive" if avg_sentiment > 0.05 else "Negative" if avg_sentiment< -0.05 else "Neutral"
+
+                col1, col2, col3=st.columns(3)
+                col1.metric("Avg Sentiment", f"{avg_sentiment:.3f}")
+                col2.metric("Mood", sentiment_label)
+                col3.metric("Articles Analyzed", len(sentiment_df))
+
+                #Sentiment timeline chart
+                daily_sentiment=sentiment_df.groupby("Date")["Sentiment"].mean().reset_index()
+                fig5=px.line(daily_sentiment, x="Date", y="Sentiment", title=f"{company_name} - Daily News Sentiment")
+                fig5.add_hline(y=0, line_dash="dash", line_color="gray")
+                st.plotly_chart(fig5, use_container_width=True)
+
+                #Headline table with color
+                st.subheader("Recent Headlines")
+                def color_sentiment(val):
+                    if val>0.05:
+                        return "background-color: #d4edda"
+                    elif val<-0.05:
+                        return "background-color: #f8d7da"
+                    return ""
+
+                styled_df = sentiment_df[["Date", "Headline", "Source", "Sentiment"]]
+                st.dataframe(
+                    styled_df.style.applymap(color_sentiment, subset=["Sentiment"]),
+                    use_container_width=True,
+                    height=400
+                )
+            
 
 with chat_col:
     st.subheader("💬 Ask FinSights-AI")
