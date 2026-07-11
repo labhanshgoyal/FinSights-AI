@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from newsapi import NewsApiClient
 from textblob import TextBlob
 from datetime import datetime, timedelta
+import google.generativeai as genai
 
 # Streamlit App
 
@@ -107,6 +108,21 @@ if data.empty:
 
 df = data.reset_index()
 
+#Setup Gemini LLM
+try:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    gemini_model=genai.GenerativeModel("gemini-2.0-flash")
+    llm_available=True
+except Exception:
+    llm_available=False
+
+def generative_ai_analysis(prompt_text):
+    try:
+        response=gemini_model.generate_content(prompt_text)
+        return response.text
+    except Exception as e:
+        return f"Analysis Unavailable: {e}"
+
 #Main Layout
 
 main_col, chat_col = st.columns([7, 3])
@@ -161,6 +177,25 @@ with main_col:
         ax.set_title(f"{ticker} — Actual vs Predicted")
         ax.legend()
         st.pyplot(fig2)
+
+        #AI Analysis
+        if llm_available:
+            st.markdown("---")
+            st.subheader("🔮 AI Forecast Analysis")
+            with st.spinner("Generating AI insights..."):
+                last_price=df_prophet["y"].iloc[-1]
+                predicted_price=forecast["yhat"].iloc[-1]
+                direction="UP" if predicted_price > last_price else "DOWN"
+
+                prompt= f"""You are a financial analyst. Analyze this stock data briefly: Stock: {ticker} Current Price: {last_price:.2f} 
+                {forecast_days}-Day Forecast: {predicted_price:.2f} ({direction})
+                Confidence Range: {forecast['yhat_lower'].iloc[-1]:.2f} to{forecast['yhat_upper'].iloc[-1]:.2f}
+
+                Give a 3-4 sentence market outlook. Mention the trend, confidence, and risks.
+                Add disclaimer: This is not financial advice."""
+
+                ai_response=generative_ai_analysis(prompt)
+                st.markdown(ai_response)
 
     with tab2:
         st.header("🎯 Predict Direction")
@@ -219,6 +254,27 @@ with main_col:
 
         fig4=px.bar(importance, x="Importance", y="Feature", orientation="h", title="What Drives the Prediction?", color="Importance", color_continuous_scale="Blues")
         st.plotly_chart(fig4, use_container_width=True)
+
+        #AI Analysis
+        if llm_available:
+            st.markdown("---")
+            st.subheader("🤖 AI Analysis")
+            with st.spinner("Generating AI insights..."):
+                top_feature=importance.iloc[0]["Feature"]
+
+                prompt = f"""You are a financial analyst. Analyze this prediction briefly: 
+                Stock: {ticker}
+                Model Prediction: {'UP' if y_pred[-1]==1 else 'DOWN'}
+                Model Accuracy: {acc:.0%}
+                Top Feature: {top_feature}
+                Features Used: Return, SMA_5, SMA_10, Volatility
+
+                Give a 3-4 sentence analysis. Menton model confidence, what drives the prediction, and limitations.
+                Add disclaimer: This is not financial advice."""
+
+                ai_response=generative_ai_analysis
+                st.markdown(ai_response)
+                
 
     with tab3:
         st.header("📰 News & Sentiment")
