@@ -116,6 +116,7 @@ try:
 except Exception:
     llm_available=False
 
+@st.cache_data(ttl=600)
 def generative_ai_analysis(prompt_text):
     try:
         response=gemini_model.generate_content(prompt_text)
