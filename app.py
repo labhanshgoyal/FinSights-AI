@@ -295,9 +295,9 @@ with main_col:
                 st.subheader("Recent Headlines")
                 def color_sentiment(val):
                     if val>0.05:
-                        return "background-color: #d4edda"
+                        return "background-color: #1b5e20; color: white"
                     elif val<-0.05:
-                        return "background-color: #f8d7da"
+                        return "background-color: #b71c1c; color: white"
                     return ""
 
                 styled_df = sentiment_df[["Date", "Headline", "Source", "Sentiment"]]
