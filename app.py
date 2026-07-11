@@ -272,7 +272,7 @@ with main_col:
                 Give a 3-4 sentence analysis. Menton model confidence, what drives the prediction, and limitations.
                 Add disclaimer: This is not financial advice."""
 
-                ai_response=generative_ai_analysis
+                ai_response=generative_ai_analysis(prompt)
                 st.markdown(ai_response)
                 
 
