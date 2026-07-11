@@ -3,7 +3,7 @@ import pandas as pd
 import yfinance as yf
 from prophet import Prophet
 import plotly.express as px
-from sklearn.ensemble import RandomForestClassifier
+from xgboost import XGBClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 import seaborn as sns
@@ -224,8 +224,8 @@ with main_col:
             X, y, test_size=0.2, shuffle=False
         )
 
-        #Train RandomForest
-        clf=RandomForestClassifier(n_estimators=100, random_state=42) #100 decision trees
+        #Train XGBoost
+        clf=XGBClassifier(n_estimators=100, random_state=42, use_label_encoder=False, eval_metric="logloss") #100 decision trees
         clf.fit(X_train, y_train)
         y_pred = clf.predict(X_test) #make predictions on test data
 

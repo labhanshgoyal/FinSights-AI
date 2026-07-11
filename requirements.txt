@@ -10,3 +10,4 @@ matplotlib
 newsapi-python
 textblob
 google-generativeai
+xgboost
