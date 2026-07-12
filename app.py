@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from newsapi import NewsApiClient
 from textblob import TextBlob
 from datetime import datetime, timedelta
-import google.generativeai as genai
+from groq import Groq
 
 # Streamlit App
 
@@ -108,10 +108,9 @@ if data.empty:
 
 df = data.reset_index()
 
-#Setup Gemini LLM
+#Setup Groq LLM
 try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    gemini_model=genai.GenerativeModel("gemini-2.0-flash")
+    groq_client=Groq(api_key=st.secrets["GROQ_API_KEY"])
     llm_available=True
 except Exception:
     llm_available=False
@@ -119,8 +118,13 @@ except Exception:
 @st.cache_data(ttl=600)
 def generative_ai_analysis(prompt_text):
     try:
-        response=gemini_model.generate_content(prompt_text)
-        return response.text
+        response=groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt_text}],
+            temperature=0.7,
+            max_tokens=500
+        )
+        return response.choices[0].message.content
     except Exception as e:
         return f"Analysis Unavailable: {e}"
 
@@ -370,14 +374,14 @@ with chat_col:
     st.caption(f"Ask anything about {ticker}")
     
     if not llm_available:
-        st.warning("Add GEMINI_API_KEY to enable chat.")
+        st.warning("Add GROQ_API_KEY to enable chat.")
     else:
         #Initialize chat history
         if "messages" not in st.session_state:
             st.session_state.messages=[]
 
         for message in st.session_state.messages:
-            with st.chat_message(messsage["role"]):
+            with st.chat_message(message["role"]):
                 st.markdown(message["content"])
 
         if prompt := st.chat_input("Ask about forecast, news, trends..."):
@@ -402,8 +406,13 @@ with chat_col:
             with st.chat_message("assistant"):
                 with st.spinner("Thinking..."):
                     try:
-                        response=gemini_model.generate_content(context)
-                        full_response=response.text
+                        response=groq_client.chat.completions.create(
+                            model="llama-3.3-70b-versatile",
+                            messages=[{"role": "user", "content": context}],
+                            temperature=0.7,
+                            max_tokens=500
+                        )
+                        full_response=response.choices[0].message.content
                         st.markdown(full_response)
                         st.session_state.messages.append({"role": "assistant", "content": full_response})
                     except Exception as e:

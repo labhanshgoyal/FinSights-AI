@@ -9,5 +9,5 @@ seaborn
 matplotlib
 newsapi-python
 textblob
-google-generativeai
+groq
 xgboost
