@@ -398,7 +398,6 @@ with chat_col:
             Time period: {period}
 
             Keep answers concise. Be professional.
-            Add disclaimer: This is not financial advice.
 
             User Question: {prompt}"""
 
