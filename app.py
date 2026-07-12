@@ -182,21 +182,21 @@ with main_col:
         #AI Analysis
         if llm_available:
             st.markdown("---")
-            st.subheader("🔮 AI Forecast Analysis")
-            with st.spinner("Generating AI insights..."):
-                last_price=df_prophet["y"].iloc[-1]
-                predicted_price=forecast["yhat"].iloc[-1]
-                direction="UP" if predicted_price > last_price else "DOWN"
+            if st.button("🔮 Generate AI Forecast Analysis", key="ai_tab1"):
+                with st.spinner("Generating AI insights..."):
+                    last_price=df_prophet["y"].iloc[-1]
+                    predicted_price=forecast["yhat"].iloc[-1]
+                    direction="UP" if predicted_price > last_price else "DOWN"
 
-                prompt= f"""You are a financial analyst. Analyze this stock data briefly: Stock: {ticker} Current Price: {last_price:.2f} 
-                {forecast_days}-Day Forecast: {predicted_price:.2f} ({direction})
-                Confidence Range: {forecast['yhat_lower'].iloc[-1]:.2f} to{forecast['yhat_upper'].iloc[-1]:.2f}
+                    prompt= f"""You are a financial analyst. Analyze this stock data briefly: Stock: {ticker} Current Price: {last_price:.2f} 
+                    {forecast_days}-Day Forecast: {predicted_price:.2f} ({direction})
+                    Confidence Range: {forecast['yhat_lower'].iloc[-1]:.2f} to{forecast['yhat_upper'].iloc[-1]:.2f}
 
-                Give a 3-4 sentence market outlook. Mention the trend, confidence, and risks.
-                Add disclaimer: This is not financial advice."""
+                    Give a 3-4 sentence market outlook. Mention the trend, confidence, and risks.
+                    Add disclaimer: This is not financial advice."""
 
-                ai_response=generative_ai_analysis(prompt)
-                st.markdown(ai_response)
+                    ai_response=generative_ai_analysis(prompt)
+                    st.markdown(ai_response)
 
     with tab2:
         st.header("🎯 Predict Direction")
@@ -259,22 +259,22 @@ with main_col:
         #AI Analysis
         if llm_available:
             st.markdown("---")
-            st.subheader("🤖 AI Analysis")
-            with st.spinner("Generating AI insights..."):
-                top_feature=importance.iloc[0]["Feature"]
+            if st.button("🤖 Generate AI Prediction Analysis", key="ai_tab2"):
+                with st.spinner("Generating AI insights..."):
+                    top_feature=importance.iloc[0]["Feature"]
 
-                prompt = f"""You are a financial analyst. Analyze this prediction briefly: 
-                Stock: {ticker}
-                Model Prediction: {'UP' if y_pred[-1]==1 else 'DOWN'}
-                Model Accuracy: {acc:.0%}
-                Top Feature: {top_feature}
-                Features Used: Return, SMA_5, SMA_10, Volatility
+                    prompt = f"""You are a financial analyst. Analyze this prediction briefly: 
+                    Stock: {ticker}
+                    Model Prediction: {'UP' if y_pred[-1]==1 else 'DOWN'}
+                    Model Accuracy: {acc:.0%}
+                    Top Feature: {top_feature}
+                    Features Used: Return, SMA_5, SMA_10, Volatility
 
-                Give a 3-4 sentence analysis. Menton model confidence, what drives the prediction, and limitations.
-                Add disclaimer: This is not financial advice."""
+                    Give a 3-4 sentence analysis. Mention model confidence, what drives the prediction, and limitations.
+                    Add disclaimer: This is not financial advice."""
 
-                ai_response=generative_ai_analysis(prompt)
-                st.markdown(ai_response)
+                    ai_response=generative_ai_analysis(prompt)
+                    st.markdown(ai_response)
                 
 
     with tab3:
