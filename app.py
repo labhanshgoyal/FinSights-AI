@@ -368,4 +368,43 @@ with main_col:
 with chat_col:
     st.subheader("💬 Ask FinSights-AI")
     st.caption(f"Ask anything about {ticker}")
-    st.info("🚧 AI chat will be added in Phase 3")
+    
+    if not llm_available:
+        st.warning("Add GEMINI_API_KEY to enable chat.")
+    else:
+        #Initialize chat history
+        if "messages" not in st.session_state:
+            st.session_state.messages=[]
+
+        for message in st.session_state.messages:
+            with st.chat_message(messsage["role"]):
+                st.markdown(message["content"])
+
+        if prompt := st.chat_input("Ask about forecast, news, trends..."):
+
+            st.chat_message("user").markdown(prompt)
+            st.session_state.messages.append({"role": "user", "content": prompt})
+
+            #Build RAG context (live data into prompt)
+            latest_price=df["Close"].iloc[-1]
+
+            context = f"""You are FinSights AI, a helpful financial assistant.
+            Stock being analyzed: {ticker}
+            Latest closing price: ${latest_price:.2f}
+            Time period: {period}
+
+            Keep answers concise. Be professional.
+            Add disclaimer: This is not financial advice.
+
+            User Question: {prompt}"""
+
+            #AI Response
+            with st.chat_message("assistant"):
+                with st.spinner("Thinking..."):
+                    try:
+                        response=gemini_model.generate_content(context)
+                        full_response=response.text
+                        st.markdown(full_response)
+                        st.session_state.messages.append({"role": "assistant", "content": full_response})
+                    except Exception as e:
+                        st.error(f"Chat unavailable: {e}")
