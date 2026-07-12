@@ -108,6 +108,25 @@ if data.empty:
 
 df = data.reset_index()
 
+#Fetch stock info (company name)
+@st.cache_data(ttl=3600)
+def get_stock_info(symbol):
+    try:
+        info=yf.Ticker(symbol).info
+        return info.get("shortName", symbol)
+    except Exception:
+        return symbol
+
+stock_name=get_stock_info(ticker)
+
+#Calculate price metrics
+current_price=df["Close"].iloc[-1]
+prev_price=df["Close"].iloc[-2] if len(df)>1 else current_price
+price_change=current_price - prev_price
+pct_change=(price_change / prev_price) * 100
+change_color="#00c853" if price_change >= 0 else "#ff1744"
+arrow="▲" if price_change >= 0 else "▼"
+
 #Setup Groq LLM
 try:
     groq_client=Groq(api_key=st.secrets["GROQ_API_KEY"])
@@ -133,7 +152,19 @@ def generative_ai_analysis(prompt_text):
 main_col, chat_col = st.columns([7, 3])
 
 with main_col:
-    st.title(f" {ticker} - Stock Analysis")
+    #Stock Header (styled like stock apps)
+    st.markdown(f"""
+    <div style="padding: 1rem 0; border-bottom: 1px solid #333; margin-bottom: 1rem;">
+        <div style="font-size: 0.9rem; color: #888; letter-spacing: 1px; text-transform: uppercase;">{ticker}</div>
+        <div style="font-size: 1.8rem; font-weight: 700; color: #fff; margin: 0.1rem 0;">{stock_name}</div>
+        <div style="display: flex; align-items: baseline; gap: 0.8rem; margin-top: 0.3rem;">
+            <span style="font-size: 2rem; font-weight: 600; color: #fff;">₹{current_price:.2f}</span>
+            <span style="font-size: 1.1rem; font-weight: 500; color: {change_color};">
+                {arrow} {abs(price_change):.2f} ({abs(pct_change):.2f}%)
+            </span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     tab1, tab2, tab3 = st.tabs([
         "📈 Price Forecast",
