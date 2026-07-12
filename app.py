@@ -111,7 +111,7 @@ df = data.reset_index()
 #Setup Gemini LLM
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    gemini_model=genai.GenerativeModel("gemini-1.5-flash")
+    gemini_model=genai.GenerativeModel("gemini-pro")
     llm_available=True
 except Exception:
     llm_available=False
