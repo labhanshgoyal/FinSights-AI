@@ -192,12 +192,34 @@ def apply_theme():
         border-top-color: #6366f1 !important;
     }
 
-    /* ── Chat section ── */
+    /* ── Chat Panel ── */
+    .chat-header {
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.06));
+        border: 1px solid rgba(99, 102, 241, 0.15);
+        border-radius: 16px 16px 0 0;
+        padding: 1rem 1.2rem;
+        margin-bottom: 0;
+    }
+    .chat-header-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #f1f5f9;
+    }
+    .chat-header-sub {
+        font-size: 0.75rem;
+        color: #818cf8;
+        margin-top: 0.15rem;
+    }
     [data-testid="stChatMessage"] {
         background: rgba(255, 255, 255, 0.03) !important;
         border: 1px solid rgba(255, 255, 255, 0.06);
         border-radius: 12px;
         margin-bottom: 0.5rem;
+        padding: 0.8rem;
+    }
+    /* Style the scrollable chat container */
+    .chat-scroll-area [data-testid="stVerticalBlock"] {
+        gap: 0.5rem;
     }
 
     /* ── Plotly chart container ── */

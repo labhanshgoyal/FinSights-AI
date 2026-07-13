@@ -393,9 +393,14 @@ with main_col:
             
 
 with chat_col:
-    st.subheader("💬 Ask FinSights-AI")
-    st.caption(f"Ask anything about {ticker}")
-    
+    #Chat Header
+    st.markdown(f"""
+    <div class="chat-header">
+        <div class="chat-header-title">💬 Ask FinSights-AI</div>
+        <div class="chat-header-sub"><span class="pulse-dot"></span> Analyzing {ticker} · {stock_name}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
     if not llm_available:
         st.warning("Add GROQ_API_KEY to enable chat.")
     else:
@@ -403,13 +408,32 @@ with chat_col:
         if "messages" not in st.session_state:
             st.session_state.messages=[]
 
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+        #Scrollable chat container (fixed height)
+        chat_container=st.container(height=500)
 
+        with chat_container:
+            if not st.session_state.messages:
+                st.markdown("""
+                <div style="text-align: center; padding: 3rem 1rem; color: #64748b;">
+                    <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🤖</div>
+                    <div style="font-size: 0.9rem; font-weight: 500;">Ask me anything about {}</div>
+                    <div style="font-size: 0.75rem; margin-top: 0.3rem; color: #475569;">Forecasts · Predictions · News · Trends</div>
+                </div>
+                """.format(ticker), unsafe_allow_html=True)
+            else:
+                for message in st.session_state.messages:
+                    with st.chat_message(message["role"]):
+                        st.markdown(message["content"])
+
+        #Clear history button
+        if st.session_state.messages:
+            if st.button("🗑️ Clear Chat", key="clear_chat"):
+                st.session_state.messages=[]
+                st.rerun()
+
+        #Chat input
         if prompt := st.chat_input("Ask about forecast, news, trends..."):
 
-            st.chat_message("user").markdown(prompt)
             st.session_state.messages.append({"role": "user", "content": prompt})
 
             #Build RAG context (live data into prompt)
@@ -420,22 +444,21 @@ with chat_col:
             Latest closing price: ${latest_price:.2f}
             Time period: {period}
 
-            Keep answers concise. Be professional.
+            Keep answers concise (3-5 sentences). Be professional.
 
             User Question: {prompt}"""
 
             #AI Response
-            with st.chat_message("assistant"):
-                with st.spinner("Thinking..."):
-                    try:
-                        response=groq_client.chat.completions.create(
-                            model="llama-3.3-70b-versatile",
-                            messages=[{"role": "user", "content": context}],
-                            temperature=0.7,
-                            max_tokens=500
-                        )
-                        full_response=response.choices[0].message.content
-                        st.markdown(full_response)
-                        st.session_state.messages.append({"role": "assistant", "content": full_response})
-                    except Exception as e:
-                        st.error(f"Chat unavailable: {e}")
+            try:
+                response=groq_client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[{"role": "user", "content": context}],
+                    temperature=0.7,
+                    max_tokens=500
+                )
+                full_response=response.choices[0].message.content
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
+            except Exception as e:
+                st.session_state.messages.append({"role": "assistant", "content": f"⚠️ Chat unavailable: {e}"})
+
+            st.rerun()
