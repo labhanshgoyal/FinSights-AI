@@ -11,3 +11,7 @@ newsapi-python
 textblob
 groq
 xgboost
+crewai
+ragas
+langchain-groq
+litellm

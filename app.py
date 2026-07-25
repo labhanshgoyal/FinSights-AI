@@ -22,6 +22,7 @@ st.set_page_config(
 )
 
 from styles import apply_theme, render_stock_header
+from agents import run_crew
 
 # Apply Premium UI Theme
 apply_theme()
@@ -236,16 +237,17 @@ with main_col:
         df["Return"] = df["Close"].pct_change() #daily % change in prices
         df["SMA_5"] = df["Close"].rolling(window=5).mean() #5-day moving avg
         df["SMA_10"] = df["Close"].rolling(window=10).mean() #10 day moving avg
+        df["SMA_20"] = df["Close"].rolling(window=20).mean() # 20 day moving avg
         df["Volatility"] = df["Return"].rolling(window=10).std() # 10 day volatility (risk)
-        df["Target"] = (df["Return"]>0).astype(int) # 1 = price went UP, 0 = DOWN
+        df["RSI"] = 100-(100/(1+(df["Close"].diff().clip(lower=0).rolling(14).mean()/df["Close"].diff().clip(upper=0).abs().rolling(14).mean())))
+        df["Target"] = (df["Return"].shift(-1)>0).astype(int) # 1 = price went UP, 0 = DOWN
 
         df_clean=df.dropna() #remove rows with NaN (first 10 rows)
 
         #Split into features(X) and target(Y)
-        features=["Return", "SMA_5","SMA_10","Volatility"]
+        features=["Return", "SMA_5","SMA_10","SMA_20","Volatility","RSI"]
         X = df_clean[features] #input columns
-        y = df_clean["Target"] 
-
+        y = df_clean["Target"]
 
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, shuffle=False
@@ -439,24 +441,12 @@ with chat_col:
             #Build RAG context (live data into prompt)
             latest_price=df["Close"].iloc[-1]
 
-            context = f"""You are FinSights AI, a helpful financial assistant.
-            Stock being analyzed: {ticker}
-            Latest closing price: ${latest_price:.2f}
-            Time period: {period}
-
-            Keep answers concise (3-5 sentences). Be professional.
-
-            User Question: {prompt}"""
-
             #AI Response
             try:
-                response=groq_client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[{"role": "user", "content": context}],
-                    temperature=0.7,
-                    max_tokens=500
-                )
-                full_response=response.choices[0].message.content
+                stock_context = f"""Stock: {ticker} ({stock_name})
+                Price: ${latest_price:.2f} | Period: {period}
+                Change: {price_change:.2f} ({pct_change:.2f}%)"""
+                full_response = run_crew(prompt, stock_context)
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
             except Exception as e:
                 st.session_state.messages.append({"role": "assistant", "content": f"⚠️ Chat unavailable: {e}"})
