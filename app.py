@@ -456,7 +456,8 @@ with chat_col:
                 else:
                     response = groq_client.chat.completions.create(
                         model="llama-3.3-70b-versatile",
-                        messages=[{"role": "user", "content": f"{stock_context}\n\nQuestion: {prompt}"}],
+                        messages=[{"role": "system", "content": "You are FinSights AI, a professional financial analyst. Analyze stocks using the data provided. Give specific, data-backed insights. Never refuse to analyze."},
+                        {"role": "user", "content": f"{stock_context}\n\nQuestion: {prompt}"}],
                         temperature=0.7,
                         max_tokens=500
                     )
