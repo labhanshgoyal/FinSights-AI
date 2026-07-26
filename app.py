@@ -130,8 +130,8 @@ def get_stock_info(symbol):
 stock_name=get_stock_info(ticker)
 
 #Calculate price metrics
-current_price=df["Close"].iloc[-1]
-prev_price=df["Close"].iloc[-2] if len(df)>1 else current_price
+current_price=df["Close"].dropna().iloc[-1]
+prev_price=df["Close"].dropna().iloc[-2] if len(df)>1 else current_price
 price_change=current_price - prev_price
 pct_change=(price_change / prev_price) * 100
 
