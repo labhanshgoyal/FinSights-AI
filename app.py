@@ -22,7 +22,11 @@ st.set_page_config(
 )
 
 from styles import apply_theme, render_stock_header
-from agents import run_crew
+try:
+    from agents import run_crew
+    crew_available = True
+except Exception:
+    crew_available = False
 
 # Apply Premium UI Theme
 apply_theme()
@@ -446,7 +450,18 @@ with chat_col:
                 stock_context = f"""Stock: {ticker} ({stock_name})
                 Price: ${latest_price:.2f} | Period: {period}
                 Change: {price_change:.2f} ({pct_change:.2f}%)"""
-                full_response = run_crew(prompt, stock_context)
+
+                if crew_available:
+                    full_response = run_crew(prompt, stock_context)
+                else:
+                    response = groq_client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[{"role": "user", "content": f"{stock_context}\n\nQuestion: {prompt}"}],
+                        temperature=0.7,
+                        max_tokens=500
+                    )
+                    full_response = response.choices[0].message.content
+
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
             except Exception as e:
                 st.session_state.messages.append({"role": "assistant", "content": f"⚠️ Chat unavailable: {e}"})
