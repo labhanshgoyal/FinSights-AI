@@ -443,8 +443,10 @@ with chat_col:
             st.session_state.messages.append({"role": "user", "content": prompt})
 
             #Build RAG context (live data into prompt)
-            latest_price=df["Close"].iloc[-1]
-
+            latest_price=df["Close"].dropna().iloc[-1]
+            if pd.isna(latest_price):
+                latest_price=current_price
+            
             #AI Response
             try:
                 stock_context = f"""Stock: {ticker} ({stock_name})
