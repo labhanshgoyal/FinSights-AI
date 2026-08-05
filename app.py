@@ -13,8 +13,6 @@ from textblob import TextBlob
 from datetime import datetime, timedelta
 from groq import Groq
 
-# Streamlit App
-
 st.set_page_config(
     page_title="FinSights AI",
     page_icon="📊",
@@ -22,16 +20,20 @@ st.set_page_config(
 )
 
 from styles import apply_theme, render_stock_header
+
 try:
     from agents import run_crew
     crew_available = True
 except Exception:
     crew_available = False
 
-# Apply Premium UI Theme
-apply_theme()
+try:
+    from validator import validate_response
+    validator_available = True
+except Exception as e:
+    validator_available = False
 
-# Stock list
+apply_theme()
 
 STOCK_LIST = {
     "Apple (AAPL)": "AAPL",
@@ -42,7 +44,7 @@ STOCK_LIST = {
     "Meta (META)": "META",
     "Netflix (NFLX)": "NFLX",
     "NVIDIA (NVDA)": "NVDA",
-    "Infosys (INFY)": "INFY",
+    "Infosys (INFY.NS)": "INFY.NS",
     "TCS (TCS.NS)": "TCS.NS",
     "Reliance (RELIANCE.NS)": "RELIANCE.NS",
     "HDFC Bank (HDFCBANK.NS)": "HDFCBANK.NS",
@@ -56,8 +58,6 @@ STOCK_LIST = {
     "Bajaj Finance (BAJFINANCE.NS)": "BAJFINANCE.NS",
 }
 
-# SIDEBAR
-
 st.sidebar.title("📊 FinSights AI")
 st.sidebar.markdown("Smart Stock Prediction using AI")
 
@@ -67,7 +67,7 @@ stock_names = list(STOCK_LIST.keys())
 selected_stock = st.sidebar.selectbox(
     "Choose a company",
     options=stock_names,
-    index=stock_names.index("Infosys (INFY)")
+    index=stock_names.index("Infosys (INFY.NS)")
 )
 
 custom_ticker=st.sidebar.text_input(
@@ -95,8 +95,6 @@ forecast_days = st.sidebar.slider(
     value=30,
     step=7
 )
-
-#Data Fetching (With Caching)
 
 @st.cache_data(ttl=300)
 def fetch_stock_data(ticker, period):
@@ -155,8 +153,6 @@ def generative_ai_analysis(prompt_text):
     except Exception as e:
         return f"Analysis Unavailable: {e}"
 
-#Main Layout
-
 main_col, chat_col = st.columns([7, 3])
 
 with main_col:
@@ -200,7 +196,7 @@ with main_col:
         fig=px.line(forecast, x="ds", y="yhat", title=f"{ticker} - {forecast_days}-Day Forecast")
         fig.add_scatter(x=forecast["ds"], y=forecast["yhat_upper"], mode="lines", name="Upper Bound", line=dict(dash="dot", color="gray")) #upper confidence bound
         fig.add_scatter(x=forecast["ds"], y=forecast["yhat_lower"], mode="lines", name="Lower Bound",  line=dict(dash="dot", color="red")) #lower confidence bound
-        st.plotly_chart(fig, use_container_width=True) #render the chart
+        st.plotly_chart(fig, width='stretch') #render the chart
 
         #Chart-2: Actual vs Forecasted Values
         fig2, ax = plt.subplots(figsize=(10, 5)) #create matplotlib figure
@@ -287,7 +283,7 @@ with main_col:
         }).sort_values("Importance", ascending=False)
 
         fig4=px.bar(importance, x="Importance", y="Feature", orientation="h", title="What Drives the Prediction?", color="Importance", color_continuous_scale="Blues")
-        st.plotly_chart(fig4, use_container_width=True)
+        st.plotly_chart(fig4, width='stretch')
 
         #AI Analysis
         if llm_available:
@@ -379,7 +375,7 @@ with main_col:
                 daily_sentiment=sentiment_df.groupby("Date")["Sentiment"].mean().reset_index()
                 fig5=px.line(daily_sentiment, x="Date", y="Sentiment", title=f"{company_name} - Daily News Sentiment")
                 fig5.add_hline(y=0, line_dash="dash", line_color="gray")
-                st.plotly_chart(fig5, use_container_width=True)
+                st.plotly_chart(fig5, width='stretch')
 
                 #Headline table with color
                 st.subheader("Recent Headlines")
@@ -393,7 +389,7 @@ with main_col:
                 styled_df = sentiment_df[["Date", "Headline", "Source", "Sentiment"]]
                 st.dataframe(
                     styled_df.style.map(color_sentiment, subset=["Sentiment"]),
-                    use_container_width=True,
+                    width='stretch',
                     height=400
                 )
             
@@ -453,19 +449,32 @@ with chat_col:
                 Price: ${latest_price:.2f} | Period: {period}
                 Change: {price_change:.2f} ({pct_change:.2f}%)"""
 
-                if crew_available:
-                    full_response = run_crew(prompt, stock_context)
-                else:
-                    response = groq_client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",
-                        messages=[{"role": "system", "content": "You are FinSights AI, a professional financial analyst. Analyze stocks using the data provided. Give specific, data-backed insights. Never refuse to analyze."},
-                        {"role": "user", "content": f"{stock_context}\n\nQuestion: {prompt}"}],
-                        temperature=0.7,
-                        max_tokens=500
-                    )
-                    full_response = response.choices[0].message.content
+                max_retries = 2
+                for attempt in range(max_retries + 1):
+                    if crew_available:
+                        full_response = run_crew(prompt, stock_context)
+                    else:
+                        response = groq_client.chat.completions.create(
+                            model="llama-3.3-70b-versatile",
+                            messages=[
+                                {"role": "system", "content": "You are FinSights AI, a professional financial analyst. Analyze stocks using the data provided. Give specific, data-backed insights. Never refuse to analyze."},
+                                {"role": "user", "content": f"{stock_context}\n\nQuestion: {prompt}"}
+                            ],
+                            temperature=0.7,
+                            max_tokens=500
+                        )
+                        full_response = response.choices[0].message.content
 
+                    if validator_available and attempt < max_retries:
+                        validation = validate_response(prompt, full_response)
+                        if validation["pass"]:
+                            full_response += f"\n\n*✅ Quality Score: {validation['score']}/1.0*"
+                            break
+                        prompt = f"{prompt}\n\nPrevious answer was weak ({validation['feedback']}). Be more specific and data-driven."
+                    else:
+                        break
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
+
             except Exception as e:
                 st.session_state.messages.append({"role": "assistant", "content": f"⚠️ Chat unavailable: {e}"})
 

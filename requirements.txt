@@ -12,6 +12,5 @@ textblob
 groq
 xgboost
 crewai
-ragas
 langchain-groq
 litellm
