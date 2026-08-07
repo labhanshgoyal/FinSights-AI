@@ -159,10 +159,11 @@ with main_col:
     #Stock Header
     render_stock_header(ticker, stock_name, current_price, price_change, pct_change)
 
-    tab1, tab2, tab3 = st.tabs([
+    tab1, tab2, tab3, tab4 = st.tabs([
         "📈 Price Forecast",
         "🎯 Predict Direction",
-        "📰 News & Sentiment"
+        "📰 News & Sentiment",
+        "🤖 Agent Workflows"
     ])
 
     # Tab Placeholders
@@ -393,6 +394,67 @@ with main_col:
                     height=400
                 )
             
+    with tab4:
+        st.header("🤖 Agent Workflow")
+        st.markdown("How our multi-agent system processes your queries:")
+
+        # Visual pipeline
+        st.markdown("""
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 2rem 0;">
+            <div style="background: linear-gradient(135deg, #1e3a5f, #2d5a8e); padding: 20px; border-radius: 12px; flex: 1; min-width: 200px; text-align: center;">
+                <div style="font-size: 2rem;">🔍</div>
+                <div style="font-weight: 700; color: #60a5fa; margin: 8px 0;">Researcher</div>
+                <div style="font-size: 0.8rem; color: #94a3b8;">Gathers stock metrics, price data, SMA, volatility, RSI</div>
+            </div>
+            <div style="font-size: 1.5rem; color: #475569;">→</div>
+            <div style="background: linear-gradient(135deg, #1e3a5f, #2d5a8e); padding: 20px; border-radius: 12px; flex: 1; min-width: 200px; text-align: center;">
+                <div style="font-size: 2rem;">📰</div>
+                <div style="font-weight: 700; color: #60a5fa; margin: 8px 0;">News Analyst</div>
+                <div style="font-size: 0.8rem; color: #94a3b8;">Analyzes headlines, sentiment scores, market mood</div>
+            </div>
+            <div style="font-size: 1.5rem; color: #475569;">→</div>
+            <div style="background: linear-gradient(135deg, #1e3a5f, #2d5a8e); padding: 20px; border-radius: 12px; flex: 1; min-width: 200px; text-align: center;">
+                <div style="font-size: 2rem;">🧠</div>
+                <div style="font-weight: 700; color: #60a5fa; margin: 8px 0;">Strategist</div>
+                <div style="font-size: 0.8rem; color: #94a3b8;">Synthesizes everything into actionable market analysis</div>
+            </div>
+            <div style="font-size: 1.5rem; color: #475569;">→</div>
+            <div style="background: linear-gradient(135deg, #14532d, #166534); padding: 20px; border-radius: 12px; flex: 1; min-width: 200px; text-align: center;">
+                <div style="font-size: 2rem;">✅</div>
+                <div style="font-weight: 700; color: #4ade80; margin: 8px 0;">Validator</div>
+                <div style="font-size: 0.8rem; color: #94a3b8;">Scores quality (0-1.0), retries if below 0.7</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # System status
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Agents Active", "3" if crew_available else "Fallback")
+        with col2:
+            st.metric("Validator", "✅ Active" if validator_available else "⚠️ Unavailable")
+        with col3:
+            st.metric("LLM Provider", "Groq (LLaMA-3.3-70B)")
+
+        # Architecture details
+        with st.expander("🔧 Technical Architecture"):
+            st.markdown("""
+            **Multi-Agent Pipeline (CrewAI)**
+            - 3 specialized agents run sequentially via Groq API
+            - Each agent has a unique role, goal, and backstory
+            - Output flows: Researcher → News Analyst → Strategist
+
+            **Self-Correction Loop (LLM-as-Judge)**
+            - Validator scores every response on 3 criteria: Relevancy, Specificity, Completeness
+            - Threshold: 0.7/1.0 — below this triggers a retry
+            - Max 2 retries with feedback injected into the prompt
+            - Ensures consistent, high-quality financial analysis
+
+            **Fallback System**
+            - If CrewAI fails to load → direct Groq API call with system prompt
+            - If Validator fails → response shown without scoring
+            - App never crashes — graceful degradation at every layer
+            """)
 
 with chat_col:
     #Chat Header
