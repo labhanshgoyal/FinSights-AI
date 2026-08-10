@@ -12,11 +12,15 @@ from newsapi import NewsApiClient
 from textblob import TextBlob
 from datetime import datetime, timedelta
 from groq import Groq
+from auth import sign_in, sign_up, get_oauth_url, logout, get_current_user
+from database import save_chat, get_chat_history, log_query, get_watchlist, add_to_watchlist, remove_from_watchlist
+import time
 
 st.set_page_config(
     page_title="FinSights AI",
     page_icon="📊",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 from styles import apply_theme, render_stock_header
@@ -34,6 +38,76 @@ except Exception as e:
     validator_available = False
 
 apply_theme()
+
+def render_login_page():
+    st.markdown("""
+    <div style="display: flex; justify-content: center; align-items: center; min-height: 80vh;">
+        <div style="background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(99,102,241,0.2); border-radius: 24px; padding: 3rem; max-width: 450px; width: 100%;">
+            <div style="text-align: center; margin-bottom: 2rem;">
+                <div style="font-size: 3rem; margin-bottom: 0.5rem;">📊</div>
+                <div style="font-size: 1.8rem; font-weight: 800; background: linear-gradient(135deg, #818cf8, #6366f1, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">FinSights AI</div>
+                <div style="color: #64748b; font-size: 0.9rem; margin-top: 0.3rem;">Smart Stock Analysis powered by AI</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        auth_mode = st.radio("", ["Sign In", "Create Account"], horizontal=True, label_visibility="collapsed")
+
+        if auth_mode == "Sign In":
+            email = st.text_input("Email", placeholder="you@example.com", key="login_email")
+            password = st.text_input("Password", type="password", placeholder="••••••••", key="login_pass")
+
+            if st.button("Sign In", use_container_width=True, key="signin_btn"):
+                if email and password:
+                    result = sign_in(email, password)
+                    if result["success"]:
+                        st.session_state.user = result["user"]
+                        st.session_state.user_id = result["user"].id
+                        st.session_state.user_email = result["user"].email
+                        st.rerun()
+                    else:
+                        st.error(f"Login failed: {result['error']}")
+                else:
+                    st.warning("Please enter email and password.")
+
+        else:
+            email = st.text_input("Email", placeholder="you@example.com", key="signup_email")
+            password = st.text_input("Password", type="password", placeholder="Min 6 characters", key="signup_pass")
+            confirm = st.text_input("Confirm Password", type="password", placeholder="••••••••", key="signup_confirm")
+
+            if st.button("Create Account", use_container_width=True, key="signup_btn"):
+                if not email or not password:
+                    st.warning("Please fill all fields.")
+                elif password != confirm:
+                    st.error("Passwords don't match.")
+                elif len(password) < 6:
+                    st.error("Password must be at least 6 characters.")
+                else:
+                    result = sign_up(email, password)
+                    if result["success"]:
+                        st.success("Account created! Check your email to verify, then sign in.")
+                    else:
+                        st.error(f"Signup failed: {result['error']}")
+
+        st.markdown("---")
+        st.markdown("<div style='text-align:center; color:#64748b; font-size:0.8rem;'>Or continue with</div>", unsafe_allow_html=True)
+
+        oauth_col1, oauth_col2 = st.columns(2)
+        with oauth_col1:
+            google_url = get_oauth_url("google")
+            if google_url:
+                st.link_button("🔵 Google", google_url, use_container_width=True)
+        with oauth_col2:
+            github_url = get_oauth_url("github")
+            if github_url:
+                st.link_button("⚫ GitHub", github_url, use_container_width=True)
+
+# ─── Auth Gate ───
+user = get_current_user()
+is_logged_in = user is not None
 
 STOCK_LIST = {
     "Apple (AAPL)": "AAPL",
@@ -60,6 +134,66 @@ STOCK_LIST = {
 
 st.sidebar.title("📊 FinSights AI")
 st.sidebar.markdown("Smart Stock Prediction using AI")
+
+# ─── Top-right Auth Bar ───
+auth_left, auth_right = st.columns([8, 2])
+with auth_right:
+    if is_logged_in:
+        with st.popover("👤 " + st.session_state.user_email.split("@")[0]):
+            st.markdown(f"**{st.session_state.user_email}**")
+            st.markdown("---")
+            if st.button("🚪 Sign Out", use_container_width=True, key="top_logout"):
+                logout()
+                st.rerun()
+    else:
+        with st.popover("🔐 Sign In"):
+            auth_mode = st.radio("Mode", ["Sign In", "Create Account"], horizontal=True, key="top_auth_mode")
+
+            if auth_mode == "Sign In":
+                email = st.text_input("Email", placeholder="you@example.com", key="top_email")
+                password = st.text_input("Password", type="password", placeholder="••••••••", key="top_pass")
+                if st.button("Sign In", use_container_width=True, key="top_signin"):
+                    if email and password:
+                        result = sign_in(email, password)
+                        if result["success"]:
+                            st.session_state.user = result["user"]
+                            st.session_state.user_id = result["user"].id
+                            st.session_state.user_email = result["user"].email
+                            st.rerun()
+                        else:
+                            st.error(result["error"])
+                    else:
+                        st.warning("Enter email and password.")
+            else:
+                email = st.text_input("Email", placeholder="you@example.com", key="top_signup_email")
+                password = st.text_input("Password", type="password", placeholder="Min 6 chars", key="top_signup_pass")
+                confirm = st.text_input("Confirm Password", type="password", key="top_signup_confirm")
+                if st.button("Create Account", use_container_width=True, key="top_signup"):
+                    if not email or not password:
+                        st.warning("Fill all fields.")
+                    elif password != confirm:
+                        st.error("Passwords don't match.")
+                    elif len(password) < 6:
+                        st.error("Min 6 characters.")
+                    else:
+                        result = sign_up(email, password)
+                        if result["success"]:
+                            st.success("Account created! Check email, then sign in.")
+                        else:
+                            st.error(result["error"])
+
+            st.markdown("---")
+            st.markdown("<div style='text-align:center; color:#64748b; font-size:0.8rem;'>Or continue with</div>", unsafe_allow_html=True)
+            oauth_c1, oauth_c2 = st.columns(2)
+            with oauth_c1:
+                google_url = get_oauth_url("google")
+                if google_url:
+                    st.link_button("Google", google_url, use_container_width=True)
+            with oauth_c2:
+                github_url = get_oauth_url("github")
+                if github_url:
+                    st.link_button("GitHub", github_url, use_container_width=True)
+
 
 st.sidebar.subheader("🔍 Select Stock")
 
@@ -209,7 +343,16 @@ with main_col:
         st.pyplot(fig2)
 
         #AI Analysis
-        if llm_available:
+        if not is_logged_in:
+            st.markdown("---")
+            st.markdown("""
+            <div style="text-align: center; padding: 2rem; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px solid rgba(99,102,241,0.15);">
+                <div style="font-size: 2rem;">🔒</div>
+                <div style="font-weight: 600; color: #f1f5f9; margin: 0.5rem 0;">AI Forecast Analysis</div>
+                <div style="color: #64748b; font-size: 0.85rem;">Sign in to unlock AI-powered insights</div>
+            </div>
+            """, unsafe_allow_html=True)
+        elif llm_available:
             st.markdown("---")
             st.subheader("🔮 AI Forecast Analysis")
             with st.spinner("Generating AI insights..."):
@@ -287,7 +430,16 @@ with main_col:
         st.plotly_chart(fig4, width='stretch')
 
         #AI Analysis
-        if llm_available:
+        if not is_logged_in:
+            st.markdown("---")
+            st.markdown("""
+            <div style="text-align: center; padding: 2rem; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px solid rgba(99,102,241,0.15);">
+                <div style="font-size: 2rem;">🔒</div>
+                <div style="font-weight: 600; color: #f1f5f9; margin: 0.5rem 0;">AI Prediction Analysis</div>
+                <div style="color: #64748b; font-size: 0.85rem;">Sign in to unlock AI-powered insights</div>
+            </div>
+            """, unsafe_allow_html=True)
+        elif llm_available:
             st.markdown("---")
             st.subheader("🤖 AI Analysis")
             with st.spinner("Generating AI insights..."):
@@ -308,105 +460,116 @@ with main_col:
                 
 
     with tab3:
-        st.header("📰 News & Sentiment")
-
-        #Get API Keys
-        try:
-            news_api_key = st.secrets["NEWS_API_KEY"]
-        except Exception:
-            st.warning("Add NEWS_API_KEY in .streamlit/secrets.toml to enable this feature.")
-            st.stop()
-
-        #Fetch News Article
-        @st.cache_data(ttl=3600)
-        def fetch_news(query):
-            newsapi=NewsApiClient(api_key=news_api_key)
-            today=datetime.now()
-            month_ago=today-timedelta(days=28)
-            articles=newsapi.get_everything(
-                q=query, #search term (company name)
-                from_param=month_ago.strftime("%Y-%m-%d"), #start date
-                to=today.strftime("%Y-%m-%d"), #end date
-                language="en", #English only
-                sort_by="publishedAt", #most recent first
-                page_size=30 #top 30 articles
-            )
-            return articles.get("articles",[])
-
-        #Score sentiment for each headline
-        def analyze_sentiment(articles):
-            results=[]
-            for article in articles:
-                title=article.get("title", "")
-                if not title or title == "[Removed]":
-                    continue
-                score=TextBlob(title).sentiment.polarity
-                results.append({
-                    "Date": article.get("publishedAt", "")[:10],
-                    "Headline": title,
-                    "Source": article.get("source", {}).get("name", "Unknown"),
-                    "Sentiment": round(score, 3)
-                })
-            return pd.DataFrame(results)
-
-        #Get company name from ticker for search
-        company_name=selected_stock.split("(")[0].strip()
-
-        with st.spinner("Fetching News..."):
-            articles=fetch_news(company_name)
-
-        if not articles:
-            st.warning(f"No news found for {company_name}.")
+        if not is_logged_in:
+            st.markdown("""
+            <div style="text-align: center; padding: 4rem 2rem;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🔒</div>
+                <div style="font-size: 1.3rem; font-weight: 700; color: #f1f5f9;">Sign in to unlock News & Sentiment</div>
+                <div style="color: #64748b; margin-top: 0.5rem;">Get real-time news analysis and sentiment scoring</div>
+            </div>
+            """, unsafe_allow_html=True)
         else:
-            sentiment_df=analyze_sentiment(articles)
+            st.header("📰 News & Sentiment")
 
-            if sentiment_df.empty:
-                st.warning("Could not analyze sentiment.")
-            else:
-                #Avg Sentiment metric
-                avg_sentiment=sentiment_df["Sentiment"].mean()
-                sentiment_label="Positive" if avg_sentiment > 0.05 else "Negative" if avg_sentiment< -0.05 else "Neutral"
+            try:
+                news_api_key = st.secrets["NEWS_API_KEY"]
+            except Exception:
+                st.warning("Add NEWS_API_KEY in .streamlit/secrets.toml to enable this feature.")
+                st.stop()
 
-                col1, col2, col3=st.columns(3)
-                col1.metric("Avg Sentiment", f"{avg_sentiment:.3f}")
-                col2.metric("Mood", sentiment_label)
-                col3.metric("Articles Analyzed", len(sentiment_df))
-
-                #Sentiment timeline chart
-                daily_sentiment=sentiment_df.groupby("Date")["Sentiment"].mean().reset_index()
-                fig5=px.line(daily_sentiment, x="Date", y="Sentiment", title=f"{company_name} - Daily News Sentiment")
-                fig5.add_hline(y=0, line_dash="dash", line_color="gray")
-                st.plotly_chart(fig5, width='stretch')
-
-                #Headline table with color
-                st.subheader("Recent Headlines")
-                def color_sentiment(val):
-                    if val>0.05:
-                        return "background-color: #1b5e20; color: white"
-                    elif val<-0.05:
-                        return "background-color: #b71c1c; color: white"
-                    return ""
-
-                styled_df = sentiment_df[["Date", "Headline", "Source", "Sentiment"]]
-                st.dataframe(
-                    styled_df.style.map(color_sentiment, subset=["Sentiment"]),
-                    width='stretch',
-                    height=400
+            @st.cache_data(ttl=3600)
+            def fetch_news(query):
+                newsapi=NewsApiClient(api_key=news_api_key)
+                today=datetime.now()
+                month_ago=today-timedelta(days=28)
+                articles=newsapi.get_everything(
+                    q=query,
+                    from_param=month_ago.strftime("%Y-%m-%d"),
+                    to=today.strftime("%Y-%m-%d"),
+                    language="en",
+                    sort_by="publishedAt",
+                    page_size=30
                 )
+                return articles.get("articles",[])
+
+            def analyze_sentiment(articles):
+                results=[]
+                for article in articles:
+                    title=article.get("title", "")
+                    if not title or title == "[Removed]":
+                        continue
+                    score=TextBlob(title).sentiment.polarity
+                    results.append({
+                        "Date": article.get("publishedAt", "")[:10],
+                        "Headline": title,
+                        "Source": article.get("source", {}).get("name", "Unknown"),
+                        "Sentiment": round(score, 3)
+                    })
+                return pd.DataFrame(results)
+
+            company_name=selected_stock.split("(")[0].strip()
+
+            with st.spinner("Fetching News..."):
+                articles=fetch_news(company_name)
+
+            if not articles:
+                st.warning(f"No news found for {company_name}.")
+            else:
+                sentiment_df=analyze_sentiment(articles)
+
+                if sentiment_df.empty:
+                    st.warning("Could not analyze sentiment.")
+                else:
+                    avg_sentiment=sentiment_df["Sentiment"].mean()
+                    sentiment_label="Positive" if avg_sentiment > 0.05 else "Negative" if avg_sentiment< -0.05 else "Neutral"
+
+                    col1, col2, col3=st.columns(3)
+                    col1.metric("Avg Sentiment", f"{avg_sentiment:.3f}")
+                    col2.metric("Mood", sentiment_label)
+                    col3.metric("Articles Analyzed", len(sentiment_df))
+
+                    daily_sentiment=sentiment_df.groupby("Date")["Sentiment"].mean().reset_index()
+                    fig5=px.line(daily_sentiment, x="Date", y="Sentiment", title=f"{company_name} - Daily News Sentiment")
+                    fig5.add_hline(y=0, line_dash="dash", line_color="gray")
+                    st.plotly_chart(fig5, width='stretch')
+
+                    st.subheader("Recent Headlines")
+                    def color_sentiment(val):
+                        if val>0.05:
+                            return "background-color: #1b5e20; color: white"
+                        elif val<-0.05:
+                            return "background-color: #b71c1c; color: white"
+                        return ""
+
+                    styled_df = sentiment_df[["Date", "Headline", "Source", "Sentiment"]]
+                    st.dataframe(
+                        styled_df.style.map(color_sentiment, subset=["Sentiment"]),
+                        width='stretch',
+                        height=400
+                    )
             
     with tab4:
-        st.header("🤖 Agent Workflow")
-        st.markdown("How our multi-agent system processes your queries:")
-
-        # Visual pipeline
-        st.markdown("""
-        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 2rem 0;">
-            <div style="background: linear-gradient(135deg, #1e3a5f, #2d5a8e); padding: 20px; border-radius: 12px; flex: 1; min-width: 200px; text-align: center;">
-                <div style="font-size: 2rem;">🔍</div>
-                <div style="font-weight: 700; color: #60a5fa; margin: 8px 0;">Researcher</div>
-                <div style="font-size: 0.8rem; color: #94a3b8;">Gathers stock metrics, price data, SMA, volatility, RSI</div>
+        if not is_logged_in:
+            st.markdown("""
+            <div style="text-align: center; padding: 4rem 2rem;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🔒</div>
+                <div style="font-size: 1.3rem; font-weight: 700; color: #f1f5f9;">Sign in to unlock Agent Workflow</div>
+                <div style="color: #64748b; margin-top: 0.5rem;">See how our AI agents collaborate to analyze stocks</div>
             </div>
-            <div style="font-size: 1.5rem; color: #475569;">→</div>
+            """, unsafe_allow_html=True)
+        else:
+            st.header("🤖 Agent Workflow")
+            st.markdown("How our multi-agent system processes your queries:")
+
+            # Visual pipeline
+            st.markdown("""
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 2rem 0;">
+                <div style="background: linear-gradient(135deg, #1e3a5f, #2d5a8e); padding: 20px; border-radius: 12px; flex: 1; min-width: 200px; text-align: center;">
+                    <div style="font-size: 2rem;">🔍</div>
+                    <div style="font-weight: 700; color: #60a5fa; margin: 8px 0;">Researcher</div>
+                    <div style="font-size: 0.8rem; color: #94a3b8;">Gathers stock metrics, price data, SMA, volatility, RSI</div>
+                </div>
+                <div style="font-size: 1.5rem; color: #475569;">→</div>
             <div style="background: linear-gradient(135deg, #1e3a5f, #2d5a8e); padding: 20px; border-radius: 12px; flex: 1; min-width: 200px; text-align: center;">
                 <div style="font-size: 2rem;">📰</div>
                 <div style="font-weight: 700; color: #60a5fa; margin: 8px 0;">News Analyst</div>
@@ -419,42 +582,42 @@ with main_col:
                 <div style="font-size: 0.8rem; color: #94a3b8;">Synthesizes everything into actionable market analysis</div>
             </div>
             <div style="font-size: 1.5rem; color: #475569;">→</div>
-            <div style="background: linear-gradient(135deg, #14532d, #166534); padding: 20px; border-radius: 12px; flex: 1; min-width: 200px; text-align: center;">
-                <div style="font-size: 2rem;">✅</div>
-                <div style="font-weight: 700; color: #4ade80; margin: 8px 0;">Validator</div>
-                <div style="font-size: 0.8rem; color: #94a3b8;">Scores quality (0-1.0), retries if below 0.7</div>
+                <div style="background: linear-gradient(135deg, #14532d, #166534); padding: 20px; border-radius: 12px; flex: 1; min-width: 200px; text-align: center;">
+                    <div style="font-size: 2rem;">✅</div>
+                    <div style="font-weight: 700; color: #4ade80; margin: 8px 0;">Validator</div>
+                    <div style="font-size: 0.8rem; color: #94a3b8;">Scores quality (0-1.0), retries if below 0.7</div>
+                </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
 
-        # System status
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Agents Active", "3" if crew_available else "Fallback")
-        with col2:
-            st.metric("Validator", "✅ Active" if validator_available else "⚠️ Unavailable")
-        with col3:
-            st.metric("LLM Provider", "Groq (LLaMA-3.3-70B)")
+            # System status
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Agents Active", "3" if crew_available else "Fallback")
+            with col2:
+                st.metric("Validator", "✅ Active" if validator_available else "⚠️ Unavailable")
+            with col3:
+                st.metric("LLM Provider", "Groq (LLaMA-3.3-70B)")
 
-        # Architecture details
-        with st.expander("🔧 Technical Architecture"):
-            st.markdown("""
-            **Multi-Agent Pipeline (CrewAI)**
-            - 3 specialized agents run sequentially via Groq API
-            - Each agent has a unique role, goal, and backstory
-            - Output flows: Researcher → News Analyst → Strategist
+            # Architecture details
+            with st.expander("🔧 Technical Architecture"):
+                st.markdown("""
+                **Multi-Agent Pipeline (CrewAI)**
+                - 3 specialized agents run sequentially via Groq API
+                - Each agent has a unique role, goal, and backstory
+                - Output flows: Researcher → News Analyst → Strategist
 
-            **Self-Correction Loop (LLM-as-Judge)**
-            - Validator scores every response on 3 criteria: Relevancy, Specificity, Completeness
-            - Threshold: 0.7/1.0 — below this triggers a retry
-            - Max 2 retries with feedback injected into the prompt
-            - Ensures consistent, high-quality financial analysis
+                **Self-Correction Loop (LLM-as-Judge)**
+                - Validator scores every response on 3 criteria: Relevancy, Specificity, Completeness
+                - Threshold: 0.7/1.0 — below this triggers a retry
+                - Max 2 retries with feedback injected into the prompt
+                - Ensures consistent, high-quality financial analysis
 
-            **Fallback System**
-            - If CrewAI fails to load → direct Groq API call with system prompt
-            - If Validator fails → response shown without scoring
-            - App never crashes — graceful degradation at every layer
-            """)
+                **Fallback System**
+                - If CrewAI fails to load → direct Groq API call with system prompt
+                - If Validator fails → response shown without scoring
+                - App never crashes — graceful degradation at every layer
+                """)
 
 with chat_col:
     #Chat Header
@@ -465,9 +628,18 @@ with chat_col:
     </div>
     """, unsafe_allow_html=True)
 
-    if not llm_available:
+    if not is_logged_in:
+        st.markdown("""
+        <div style="text-align: center; padding: 3rem 1rem; color: #64748b;">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🔒</div>
+            <div style="font-size: 0.9rem; font-weight: 500;">Sign in to chat with FinSights AI</div>
+            <div style="font-size: 0.75rem; margin-top: 0.3rem; color: #475569;">Get personalized stock analysis</div>
+        </div>
+        """, unsafe_allow_html=True)
+    elif not llm_available:
         st.warning("Add GROQ_API_KEY to enable chat.")
     else:
+        
         #Initialize chat history
         if "messages" not in st.session_state:
             st.session_state.messages=[]
